@@ -118,6 +118,12 @@ typedef struct _wsclient {
 
 //Function defs
 
+int libwsclient_send(wsclient *client, char *strdata);
+void libwsclient_onclose(wsclient *client, int (*cb)(wsclient *c));
+void libwsclient_onopen(wsclient *client, int (*cb)(wsclient *c));
+void libwsclient_onmessage(wsclient *client, int (*cb)(wsclient *c, wsclient_message *msg));
+void libwsclient_onerror(wsclient *client, int (*cb)(wsclient *c, wsclient_error *err));
+
 wsclient *libwsclient_new(const char *URI);
 wsclient_error *libwsclient_new_error(int errcode);
 ssize_t _libwsclient_read(wsclient *c, void *buf, size_t length);
