@@ -25,8 +25,6 @@ AC_TYPE_SIZE_T
 AC_TYPE_SSIZE_T
 
 # Checks for library functions.
-AC_FUNC_MALLOC
-AC_FUNC_REALLOC
 AC_CHECK_FUNCS([memset socket strstr strchr gettimeofday])
 AC_CHECK_LIB(pthread, pthread_create, [], [
 				       echo "This library requires pthread"
