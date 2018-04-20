@@ -26,6 +26,7 @@
 #define CLIENT_CONNECTING (1 << 1)
 #define CLIENT_SHOULD_CLOSE (1 << 2)
 #define CLIENT_SENT_CLOSE_FRAME (1 << 3)
+#define CLIENT_IS_OPEN ( 1 << 4 )
 
 
 #define REQUEST_HAS_CONNECTION (1 << 0)
@@ -66,6 +67,7 @@
 #define WS_HELPER_CREATE_SOCK_ERR -20
 #define WS_HELPER_BIND_ERR -21
 #define WS_HELPER_LISTEN_ERR -22
+#define WS_NOT_OEPN -23
 
 typedef struct _wsclient_frame {
 	unsigned int fin;
@@ -144,28 +146,7 @@ int libwsclient_helper_socket(wsclient *c, const char *path);
 void *libwsclient_helper_socket_thread(void *ptr);
 
 //Define errors
-char *errors[] = {
-		"Unknown error occured",
-		"Error while getting address info",
-		"Could connect to any address returned by getaddrinfo",
-		"Error receiving data in client run thread",
-		"Error during libwsclient_close",
-		"Error sending while handling control frame",
-		"Received masked frame from server",
-		"Got null pointer during message dispatch",
-		"Attempted to send after close frame was sent",
-		"Attempted to send during connect",
-		"Attempted to send null payload",
-		"Attempted to send too much data",
-		"Error during send in libwsclient_send",
-		"Remote end closed connection during handshake",
-		"Problem receiving data during handshake",
-		"Remote web server responded with bad HTTP status during handshake",
-		"Remote web server did not respond with upgrade header during handshake",
-		"Remote web server did not respond with connection header during handshake",
-		"Remote web server did not specify the appropriate Sec-WebSocket-Accept header during handshake",
-		NULL
-};
+extern char *errors[];
 
 int libwsclient_flags; //global flags variable
 

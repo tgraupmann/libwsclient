@@ -19,6 +19,33 @@
 #include "config.h"
 #include "sha1.h"
 
+//Define errors
+char *errors[] = {
+		"Unknown error occured",
+		"Error while getting address info",
+		"Could connect to any address returned by getaddrinfo",
+		"Error receiving data in client run thread",
+		"Error during libwsclient_close",
+		"Error sending while handling control frame",
+		"Received masked frame from server",
+		"Got null pointer during message dispatch",
+		"Attempted to send after close frame was sent",
+		"Attempted to send during connect",
+		"Attempted to send null payload",
+		"Attempted to send too much data",
+		"Error during send in libwsclient_send",
+		"Remote end closed connection during handshake",
+		"Problem receiving data during handshake",
+		"Remote web server responded with bad HTTP status during handshake",
+		"Remote web server did not respond with upgrade header during handshake",
+		"Remote web server did not respond with connection header during handshake",
+		"Remote web server did not specify the appropriate Sec-WebSocket-Accept header during handshake",
+		NULL
+};
+
+//forward declaration
+int base64_encode_ws(char *source, size_t sourcelen, char *target, size_t targetlen);
+int libwsclient_send_fragment(wsclient *client, char *strdata, int len, int flags);
 
 void libwsclient_run(wsclient *c) {
 	if(c->flags & CLIENT_CONNECTING) {
@@ -37,7 +64,7 @@ void libwsclient_run(wsclient *c) {
 void *libwsclient_run_thread(void *ptr) {
 	wsclient *c = (wsclient *)ptr;
 	wsclient_error *err = NULL;
-	int sockfd;
+	//int sockfd;
 	char buf[1024];
 	int n, i;
 	do {
@@ -64,7 +91,8 @@ void *libwsclient_run_thread(void *ptr) {
 	}
 	close(c->sockfd);
 	free(c);
-	return NULL;
+
+	pthread_exit(NULL);
 }
 
 void libwsclient_finish(wsclient *client) {
@@ -113,6 +141,7 @@ void libwsclient_close(wsclient *client) {
 	memcpy(data+2, &mask_int, 4);
 	data[0] = 0x88;
 	data[1] = 0x80;
+
 	pthread_mutex_lock(&client->send_lock);
 	do {
 		n = _libwsclient_write(client, data, 6);
@@ -172,6 +201,30 @@ void libwsclient_handle_control_frame(wsclient *c, wsclient_frame *ctl_frame) {
 				}
 			}
 			c->flags |= CLIENT_SHOULD_CLOSE;
+			break;
+		case 0x9:
+			//ping frame
+			ctl_frame->opcode = 0xa; //change opcode to PONG
+			i = 0;
+			pthread_mutex_lock(&c->send_lock);
+			while(i < ctl_frame->payload_offset + ctl_frame->payload_len && n >= 0) {
+				n = _libwsclient_write(c, ctl_frame->rawdata + i, ctl_frame->payload_offset + ctl_frame->payload_len - i);
+				i += n;
+			}
+			pthread_mutex_unlock(&c->send_lock);
+			if(n < 0) {
+				if(c->onerror) {
+					err = libwsclient_new_error(WS_HANDLE_CTL_FRAME_SEND_ERR);
+					err->extra_code = n;
+					c->onerror(c, err);
+					free(err);
+					err = NULL;
+				}
+			}
+
+			break;
+		case 0xa:
+			//pong frame as a client we don't need to do anything
 			break;
 		default:
 			fprintf(stderr, "Unhandled control frame received.  Opcode: %d\n", ctl_frame->opcode);
@@ -404,6 +457,8 @@ int libwsclient_helper_socket(wsclient *c, const char *path) {
 
 	c->helper_sock = sockfd;
 	pthread_create(&c->helper_thread, NULL, libwsclient_helper_socket_thread, (void *)c);
+
+	return 0;
 }
 
 void *libwsclient_helper_socket_thread(void *ptr) {
@@ -458,7 +513,8 @@ void *libwsclient_helper_socket_thread(void *ptr) {
 		pthread_mutex_unlock(&c->send_lock);
 		close(remote_sock);
 	}
-	return NULL;
+
+	pthread_exit(NULL);
 }
 
 wsclient *libwsclient_new(const char *URI) {
@@ -514,7 +570,9 @@ void *libwsclient_handshake_thread(void *ptr) {
 	char path[255];
 	char recv_buf[1024];
 	char *URI_copy = NULL, *p = NULL, *rcv = NULL, *tok = NULL;
-	int i, z, sockfd, n, flags = 0, headers_space = 1024;
+	int i, z, sockfd, n, flags = 0;
+	//int headers_space = 1024;
+
 	URI_copy = (char *)malloc(strlen(URI)+1);
 	if(!URI_copy) {
 		fprintf(stderr, "Unable to allocate memory in libwsclient_new.\n");
@@ -597,7 +655,7 @@ void *libwsclient_handshake_thread(void *ptr) {
 	for(z=0;z<16;z++) {
 		key_nonce[z] = rand() & 0xff;
 	}
-	base64_encode(key_nonce, 16, websocket_key, 256);
+	base64_encode_ws(key_nonce, 16, websocket_key, 256);
 	memset(request_headers, 0, 1024);
 
 	if(strcmp(port, "80") != 0) {
@@ -605,6 +663,7 @@ void *libwsclient_handshake_thread(void *ptr) {
 	} else {
 		snprintf(request_host, 255, "%s", host);
 	}
+
 	snprintf(request_headers, 1024, "GET %s HTTP/1.1\r\nUpgrade: websocket\r\nConnection: Upgrade\r\nHost: %s\r\nSec-WebSocket-Key: %s\r\nSec-WebSocket-Version: 13\r\n\r\n", path, request_host, websocket_key);
 	n = _libwsclient_write(client, request_headers, strlen(request_headers));
 	z = 0;
@@ -653,7 +712,7 @@ void *libwsclient_handshake_thread(void *ptr) {
 	for(z = 0; z < (strlen(pre_encode)/2);z++)
 		sscanf(pre_encode+(z*2), "%02hhx", sha1bytes+z);
 	memset(expected_base64, 0, 512);
-	base64_encode(sha1bytes, 20, expected_base64, 512);
+	base64_encode_ws(sha1bytes, 20, expected_base64, 512);
 	for(tok = strtok(rcv, "\r\n"); tok != NULL; tok = strtok(NULL, "\r\n")) {
 		if(*tok == 'H' && *(tok+1) == 'T' && *(tok+2) == 'T' && *(tok+3) == 'P') {
 			p = strchr(tok, ' ');
@@ -689,7 +748,7 @@ void *libwsclient_handshake_thread(void *ptr) {
 			}
 		}
 	}
-	if(!flags & REQUEST_HAS_UPGRADE) {
+	if(!(flags & REQUEST_HAS_UPGRADE)) {
 		if(client->onerror) {
 			err = libwsclient_new_error(WS_HANDSHAKE_NO_UPGRADE_ERR);
 			client->onerror(client, err);
@@ -707,7 +766,7 @@ void *libwsclient_handshake_thread(void *ptr) {
 		}
 		return NULL;
 	}
-	if(!flags & REQUEST_VALID_ACCEPT) {
+	if(!(flags & REQUEST_VALID_ACCEPT)) {
 		if(client->onerror) {
 			err = libwsclient_new_error(WS_HANDSHAKE_BAD_ACCEPT_ERR);
 			client->onerror(client, err);
@@ -724,7 +783,8 @@ void *libwsclient_handshake_thread(void *ptr) {
 	if(client->onopen != NULL) {
 		client->onopen(client);
 	}
-	return NULL;
+
+	pthread_exit(NULL);
 }
 
 //somewhat hackish stricmp
@@ -819,18 +879,19 @@ int libwsclient_send_fragment(wsclient *client, char *strdata, int len, int flag
 	unsigned char mask[4];
 	unsigned int mask_int;
 	unsigned long long payload_len;
-	unsigned char finNopcode;
+	//unsigned char finNopcode;
 	unsigned int payload_len_small;
 	unsigned int payload_offset = 6;
 	unsigned int len_size;
-	unsigned long long be_payload_len;
+	//unsigned long long be_payload_len;
 	unsigned int sent = 0;
-	int i, sockfd;
+	int i;
+	//int sockfd;
 	unsigned int frame_size;
 	char *data = NULL;
 
 
-	sockfd = client->sockfd;
+	//sockfd = client->sockfd;
 
 
 	if(client->flags & CLIENT_SENT_CLOSE_FRAME) {
@@ -947,13 +1008,14 @@ int libwsclient_send(wsclient *client, char *strdata)  {
 	unsigned int payload_len_small;
 	unsigned int payload_offset = 6;
 	unsigned int len_size;
-	unsigned long long be_payload_len;
+	//unsigned long long be_payload_len;
 	unsigned int sent = 0;
-	int i, sockfd;
+	int i;
+	//int sockfd;
 	unsigned int frame_size;
 	char *data;
 
-	sockfd = client->sockfd;
+	//sockfd = client->sockfd;
 
 	if(client->flags & CLIENT_SENT_CLOSE_FRAME) {
 		if(client->onerror) {
@@ -1060,25 +1122,31 @@ int libwsclient_send(wsclient *client, char *strdata)  {
 ssize_t _libwsclient_read(wsclient *c, void *buf, size_t length) {
 #ifdef HAVE_LIBSSL
 	if(c->flags & CLIENT_IS_SSL) {
-		return (ssize_t)SSL_read(c->ssl, buf, length);
+		if(c->ssl)
+			return (ssize_t)SSL_read(c->ssl, buf, length);
 	} else {
 #endif
-		return recv(c->sockfd, buf, length, 0);
+		if(c->sockfd)
+			return recv(c->sockfd, buf, length, 0);
 #ifdef HAVE_LIBSSL
 	}
 #endif
+	return -1;
 }
 
 ssize_t _libwsclient_write(wsclient *c, const void *buf, size_t length) {
 #ifdef HAVE_LIBSSL
 	if(c->flags & CLIENT_IS_SSL) {
-		return (ssize_t)SSL_write(c->ssl, buf, length);
+		if(c->ssl)
+			return (ssize_t)SSL_write(c->ssl, buf, length);
 	} else {
 #endif
-		return send(c->sockfd, buf, length, 0);
+		if(c->sockfd)
+			return send(c->sockfd, buf, length, 0);
 #ifdef HAVE_LIBSSL
 	}
 #endif
+	return -1;
 }
 
 
