@@ -1,3 +1,4 @@
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -14,7 +15,6 @@
 
 
 #include <pthread.h>
-
 #include "wsclient.h"
 #include "config.h"
 #include "sha1.h"
@@ -90,12 +90,11 @@ void *libwsclient_run_thread(void *ptr) {
 		c->onclose(c);
 	}
 	close(c->sockfd);
-	free(c);
-
+	c->run_thread = NULL;
 	pthread_exit(NULL);
 }
 
-void libwsclient_finish(wsclient *client) {
+void libwsclient_cleanup(wsclient *client) {
 	//TODO: handle UNIX socket helper thread shutdown better than killing it...  :P
 	if(client->helper_thread) {
 		pthread_kill(client->helper_thread, SIGINT);
@@ -104,6 +103,7 @@ void libwsclient_finish(wsclient *client) {
 		pthread_join(client->run_thread, NULL);
 	}
 
+	free(client);
 }
 
 void libwsclient_onclose(wsclient *client, int (*cb)(wsclient *c)) {
@@ -514,6 +514,7 @@ void *libwsclient_helper_socket_thread(void *ptr) {
 		close(remote_sock);
 	}
 
+	c->helper_thread = 0;
 	pthread_exit(NULL);
 }
 
@@ -549,6 +550,7 @@ wsclient *libwsclient_new(const char *URI) {
 		fprintf(stderr, "Unable to create handshake thread.\n");
 		exit(WS_EXIT_PTHREAD_CREATE);
 	}
+
 	return client;
 }
 void *libwsclient_handshake_thread(void *ptr) {

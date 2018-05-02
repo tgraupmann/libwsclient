@@ -135,7 +135,7 @@ int stricmp(const char *s1, const char *s2);
 int libwsclient_complete_frame(wsclient *c, wsclient_frame *frame);
 void libwsclient_handle_control_frame(wsclient *c, wsclient_frame *ctl_frame);
 void libwsclient_run(wsclient *c);
-void libwsclient_finish(wsclient *client);
+void libwsclient_cleanup(wsclient *client);
 void *libwsclient_run_thread(void *ptr);
 void *libwsclient_handshake_thread(void *ptr);
 void libwsclient_cleanup_frames(wsclient_frame *first);
