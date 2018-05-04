@@ -161,6 +161,18 @@ void libwsclient_close(wsclient *client) {
 	pthread_mutex_lock(&client->lock);
 	client->flags |= CLIENT_SENT_CLOSE_FRAME;
 	pthread_mutex_unlock(&client->lock);
+
+#ifdef HAVE_LIBSSL
+	if(client->flags & CLIENT_IS_SSL) {
+		if(client->ssl) {
+			SSL_shutdown(client->ssl);
+		}
+	}
+#endif
+	if(client->sockfd) {
+		shutdown(client->sockfd, SHUT_RDWR);
+	}
+
 }
 
 void libwsclient_handle_control_frame(wsclient *c, wsclient_frame *ctl_frame) {
