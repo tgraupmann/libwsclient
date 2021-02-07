@@ -10,14 +10,11 @@
 
 #include "config.h"
 
-
 #ifdef HAVE_LIBSSL
 #include <openssl/ssl.h>
 #include <openssl/err.h>
 #include <openssl/crypto.h>
 #endif
-
-
 
 #define FRAME_CHUNK_LENGTH 1024
 #define HELPER_RECV_BUF_SIZE 1024
@@ -26,8 +23,7 @@
 #define CLIENT_CONNECTING (1 << 1)
 #define CLIENT_SHOULD_CLOSE (1 << 2)
 #define CLIENT_SENT_CLOSE_FRAME (1 << 3)
-#define CLIENT_IS_OPEN ( 1 << 4 )
-
+#define CLIENT_IS_OPEN (1 << 4)
 
 #define REQUEST_HAS_CONNECTION (1 << 0)
 #define REQUEST_HAS_UPGRADE (1 << 1)
@@ -43,7 +39,6 @@
 #define WS_EXIT_PTHREAD_MUTEX_INIT -2
 #define WS_EXIT_PTHREAD_CREATE -3
 #define WS_EXIT_BAD_SCHEME -4
-
 
 #define WS_OPEN_CONNECTION_ADDRINFO_ERR -1
 #define WS_OPEN_CONNECTION_ADDRINFO_EXHAUSTED_ERR -2
@@ -69,7 +64,8 @@
 #define WS_HELPER_LISTEN_ERR -22
 #define WS_NOT_OEPN -23
 
-typedef struct _wsclient_frame {
+typedef struct _wsclient_frame
+{
 	unsigned int fin;
 	unsigned int opcode;
 	unsigned int mask_offset;
@@ -83,19 +79,22 @@ typedef struct _wsclient_frame {
 	unsigned char mask[4];
 } wsclient_frame;
 
-typedef struct _wsclient_message {
+typedef struct _wsclient_message
+{
 	unsigned int opcode;
 	unsigned long long payload_len;
 	char *payload;
 } wsclient_message;
 
-typedef struct _wsclient_error {
+typedef struct _wsclient_error
+{
 	int code;
 	int extra_code;
 	char *str;
 } wsclient_error;
 
-typedef struct _wsclient {
+typedef struct _wsclient
+{
 	pthread_t helper_thread;
 	pthread_t handshake_thread;
 	pthread_t run_thread;
@@ -118,10 +117,10 @@ typedef struct _wsclient {
 	char *origin;
 } wsclient;
 
-
 //Function defs
 
 int libwsclient_send(wsclient *client, char *strdata);
+int libwsclient_sendbinary(wsclient *client, unsigned char *buffer, unsigned int size);
 void libwsclient_onclose(wsclient *client, int (*cb)(wsclient *c));
 void libwsclient_onopen(wsclient *client, int (*cb)(wsclient *c));
 void libwsclient_onmessage(wsclient *client, int (*cb)(wsclient *c, wsclient_message *msg));
@@ -151,6 +150,5 @@ void *libwsclient_helper_socket_thread(void *ptr);
 extern char *errors[];
 
 int libwsclient_flags; //global flags variable
-
 
 #endif /* WSCLIENT_H_ */
